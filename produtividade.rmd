@@ -1,0 +1,315 @@
+---
+title: "Soja - Produtividade"
+description: "Serie historica"
+author script: 
+  - name: "Ítalo Marques-Monteiro"
+    github: https://github.com/italomarquesmonteiro
+    kaggle: https://www.kaggle.com/talomarquesmonteiro
+    linkedin: linkedin.com/in/ítalo-monteiro-0b2516144
+    lattes: http://lattes.cnpq.br/7174985368517137
+    orcid_id: https://orcid.org/0000-0003-4367-1034
+    affiliation: Anhanguera College  
+        - Department: Veterinary Medicine
+date: "2023-06-01"
+output: html_document
+---
+
+O package [tidyverse](https://www.tidyverse.org) possui um ecossistema de packages:
+                           ->[{`ggplot2`}](https://ggplot2.tidyverse.org/).
+                            ->[{`tibble`}](https://tibble.tidyverse.org/).
+                             ->[{`tidyr`}](https://tidyr.tidyverse.org/).
+                              ->[{`dplyr`}](https://dplyr.tidyverse.org/).
+                               ->[{`readr`}](https://readr.tidyverse.org/).
+                                ->[{`purrr`}](https://purrr.tidyverse.org/).
+                                 ->[{`forcats`}](https://forcats.tidyverse.org/).
+```{r}
+library(conflicted)
+library(tidyverse)
+```
+
+
+O package [{`geobr`}](https://github.com/ipeaGIT/geobr). 
+* Tem fácil acesso a conjuntos de dados espaciais oficiais do Brasil como objetos 'sf' em R. 
+* O pacote inclui uma ampla gama de dados geoespaciais disponíveis em várias escalas geográficas e por vários anos com atributos harmonizados, projeção e topologia fixa.
+* Os dados são do Instituto Brasileiro de Geografia e Estatística[IBGE](https://concla.ibge.gov.br/classificacoes/por-tema/codigo-de-areas/codigo-de-areas)
+```{r}
+estados_br <- geobr::read_state(code_state = "all", year = 2020) |>
+    dplyr::glimpse()
+```
+
+
+[Conab](https://www.conab.gov.br/)
+Dados de soja série histórica [Conab](https://www.conab.gov.br/info-agro/safras/serie-historica-das-safras/itemlist/category/911-soja)
+Manipulação e criaçao da base por Regiões do Brasil.
+
+* Criada a coluna **variação da safra** 2022/2023  [(safra 2023 / safra 2022)*100]
+```{r}
+base_temp <- readxl::read_xls("C:/Users/italo/Downloads/SojaSerieHist.xls",
+                                        sheet = 2, skip = 5) |>
+    dplyr::rename(
+        name_region = `REGIÃO/UF`,
+        `2022/23` = `2022/23 Previsão (¹)`) |>
+    dplyr::mutate(
+        name_region = dplyr::case_when(
+           name_region == "NORTE" ~ "Norte",
+           name_region == "NORDESTE" ~ "Nordeste",
+           name_region == "CENTRO-OESTE" ~ "Centro Oeste",
+           name_region == "SUDESTE" ~ "Sudeste",
+           name_region == "SUL" ~ "Sul",
+            TRUE~ name_region
+        )) |>
+    dplyr::slice(1, 9, 19, 24, 29)  |>
+    dplyr::mutate(
+        var_22_23 = ((`2022/23` / `2021/22`) * 100) - 100
+    ) |>
+    dplyr::glimpse()
+base_temp |>
+    tibble::view()
+```
+
+
+
+Os dados estão em formato largo.
+Vou usar [pivot_longer](https://tidyr.tidyverse.org/reference/pivot_longer.html) para deixá-los no formato longo
+```{r}
+serie_soja_temp <- base_temp |>
+    tidyr::pivot_longer(
+        !c(name_region, var_22_23),
+        names_to = "safras",
+        values_to = "qtd")
+```
+
+
+União dos dados espaciais com os dados no formato largo
+```{r}
+serie_soja_wider <- estados_br |>
+    dplyr::left_join(base_temp) |>
+    dplyr::glimpse()
+```
+
+
+União dos dados espaciais com os dados no formato longo
+```{r}
+serie_soja_longer <- estados_br |>
+    dplyr::left_join(serie_soja_temp) |>
+    dplyr::glimpse()
+```
+
+
+serie temporal da area plantada de soja no brasil
+```{r}
+serie_soja_produtividade <- serie_soja_longer |> 
+    ggplot(aes(
+        x = safras, y = qtd, color = as.factor(name_region))) +
+    theme(
+        legend.position = c(0.8, 0.25),
+        legend.title = element_text(size = 18),
+        legend.text=element_text(size = 14),
+        axis.title.x = element_text(size = 18),
+        axis.title.y = element_text(size = 18),
+        axis.text.y = element_text(size = 12, color = "black"),
+        axis.text.x = element_text(
+            size = 10, color = "black", angle = 30, hjust = 1, vjust = 1),
+        panel.grid.major = element_line(colour = "white"),
+        panel.background = element_rect(fill = "gray95"),
+        legend.background = element_rect(
+        fill = "grey95", colour = "white", size = 1)) +
+    labs(
+        title = "Soja - Produtividade por hectare ",
+        subtitle = "Série histórica de safras (1976-2023)",
+        caption = "by Ítalo Monteiro
+        Fonte: Conab (2023)",
+        color = "Região",
+        x = "Safras",
+        y = "Produtividade (kg-ha)") +
+    geom_point()
+serie_soja_produtividade
+```
+
+```{r}
+ggsave("Images/serie_soja_produtividade.png",
+    plot = serie_soja_produtividade,
+    dpi = 600,
+    height = 10,
+    width = 17)
+```
+
+
+
+
+```{r}
+variacao_soja_produtividade <- serie_soja_wider |>
+    ggplot() +
+    geom_sf(aes(fill = var_22_23, color = name_region)) +
+    geom_sf_text(aes(
+        label = serie_soja_wider$abbrev_state),
+        label.padding = unit(0.8, "mm"), size = 3) +
+    viridis::scale_fill_viridis(discrete = FALSE) +
+    theme(
+        legend.position = c(0.19, 0.25),
+        legend.title = element_text(size = 18),
+        legend.text= element_text(size = 14),
+        axis.title.x = element_text(size = 18),
+        axis.title.y = element_text(size = 18),
+        axis.text.y = element_text(size = 14, color = "black"),
+        axis.text.x = element_text(size = 14, color = "black"),
+        panel.grid.major = element_line(colour = "gray95"),
+        panel.background = element_rect(fill = "gray95"),
+        legend.background = element_rect(
+        fill = "grey95", colour = "gray95", size = 1)) +
+    labs(
+        color = "Região",
+        fill = "Variação por\nregião (%)",
+        x = "Longitude",
+        y = "Latitude") +
+    annotate("text", x = -51, y = 7, color = "gray30", size = 8,
+        label = "Produtividade - Variação da Safra 22/23 de Soja") +
+    annotate("text", x = -42, y = 5.5, color = "gray40", size = 4,
+        label = "Cálculo em relação a safra 21/22") +
+    annotate("text", x = -38, y = -25, color = "gray40", size = 5,
+        label = "Safras - Estimativa jun/23") +
+    annotate("text", x = -36, y = -27, size = 4.5,
+        label = "Fonte: Conab (2023)
+    by Ítalo Monteiro" , color = "gray50") +
+    ggspatial::annotation_scale(
+      height = unit(0.2, "cm"),
+      pad_x = unit(17, "cm"),
+      pad_y = unit(0.5, "cm")) +
+    ggspatial::annotation_north_arrow(
+      width = unit(0.7, "cm"),
+      height = unit(0.9, "cm"),
+      pad_x = unit(19, "cm"),
+      pad_y = unit(1, "cm"))
+variacao_soja_produtividade
+```
+
+```{r}
+ggsave("Images/variacao_soja_produtividade.png",
+    plot = variacao_soja_produtividade,
+    dpi = 600)
+```
+
+
+produtividade safra 2022/23
+```{r}
+serie_soja_longer |>
+    dplyr::select(-var_22_23) |>
+    dplyr::filter(safras == "2022/23") |>
+    ggplot() +
+    geom_sf(aes(fill = qtd)) +
+    geom_sf_text(aes(
+        label = serie_soja_wider$abbrev_state),
+        label.padding = unit(0.8, "mm"), size = 3) +
+    viridis::scale_fill_viridis(discrete = FALSE) +
+    theme(
+        legend.position = c(0.19, 0.25),
+        legend.title = element_text(size = 18),
+        legend.text= element_text(size = 14),
+        axis.title.x = element_text(size = 18),
+        axis.title.y = element_text(size = 18),
+        axis.text.y = element_text(size = 14, color = "black"),
+        axis.text.x = element_text(size = 14, color = "black"),
+        panel.grid.major = element_line(colour = "gray95"),
+        panel.background = element_rect(fill = "gray95"),
+        legend.background = element_rect(
+        fill = "grey95", colour = "gray95", size = 1)) +
+    labs(
+        fill = "kg-ha",
+        x = "Longitude",
+        y = "Latitude") +
+    annotate("text", x = -51, y = 7, color = "gray30", size = 8,
+        label = "Produtividade de Soja - Safra 22/23 ") +
+    annotate("text", x = -38, y = -25, color = "gray40", size = 5,
+        label = "Safras - Estimativa jun/23") +
+    annotate("text", x = -36, y = -27, size = 4.5,
+        label = "Fonte: Conab (2023)
+    by Ítalo Monteiro" , color = "gray50") +
+    ggspatial::annotation_scale(
+      height = unit(0.2, "cm"),
+      pad_x = unit(17, "cm"),
+      pad_y = unit(0.5, "cm")) +
+    ggspatial::annotation_north_arrow(
+      width = unit(0.7, "cm"),
+      height = unit(0.9, "cm"),
+      pad_x = unit(19, "cm"),
+      pad_y = unit(1, "cm"))
+```
+
+
+
+
+[Conab](https://www.conab.gov.br/)
+Dados de soja série histórica [Conab](https://www.conab.gov.br/info-agro/safras/serie-historica-das-safras/itemlist/category/911-soja)
+Manipulação e criaçao da base por Unidades da Federação do Brasil.
+* Criada a coluna **variação da safra** 2022/2023  [(safra 2023 / safra 2022)*100]
+```{r}
+base_state <- readxl::read_xls("C:/Users/italo/Downloads/SojaSerieHist.xls",
+                                        skip = 5) |>
+    dplyr::rename(
+        abbrev_state = `REGIÃO/UF`,
+        `2022/23` = `2022/23 Previsão (¹)`) |>
+    dplyr::slice(-c(1, 9, 19, 24, 29, 33, 34 : 37))  |>
+    dplyr::mutate(
+        var_22_23 = ((`2022/23` / `2021/22`) * 100) - 100
+    ) |>
+    dplyr::glimpse()
+base_state |>
+    tibble::view()
+```
+
+```{r}
+serie_uf <- estados_br |>
+    dplyr::left_join(base_state) |>
+    dplyr::glimpse()
+```
+
+```{r}	
+variacao_uf_produtividade <- serie_uf |>
+    ggplot() +
+    geom_sf(aes(fill = var_22_23)) +
+    geom_sf_text(aes(
+        label = serie_soja_wider$abbrev_state),
+        label.padding = unit(0.8, "mm"), size = 3) +
+    viridis::scale_fill_viridis(discrete = FALSE) +
+    theme(
+        legend.position = c(0.19, 0.25),
+        legend.title = element_text(size = 18),
+        legend.text=element_text(size = 14),
+        axis.title.x = element_text(size = 18),
+        axis.title.y = element_text(size = 18),
+        axis.text.y = element_text(size = 14, color = "black"),
+        axis.text.x = element_text(size = 14, color = "black"),
+        panel.grid.major = element_line(colour = "gray95"),
+        panel.background = element_rect(fill = "gray95"),
+        legend.background = element_rect(
+        fill = "grey95", colour = "gray95", size = 1)) +
+    labs(
+        fill = "Variação por\nestados (%)",
+        x = "Longitude",
+        y = "Latitude") +
+    annotate("text", x = -51, y = 7, color = "gray30", size = 8,
+        label = "Área plantada - Variação da Safra 22/23 de Soja") +
+    annotate("text", x = -42, y = 5.5, color = "gray40", size = 4,
+        label = "Cálculo em relação a safra 21/22") +
+    annotate("text", x = -38, y = -25, color = "gray40", size = 5,
+        label = "Safras - Estimativa jun/23") +
+    annotate("text", x = -36, y = -27, size = 4.5,
+        label = "Fonte: Conab (2023)
+    by Ítalo Monteiro" , color = "gray50") +
+    ggspatial::annotation_scale(
+      height = unit(0.2, "cm"),
+      pad_x = unit(17, "cm"),
+      pad_y = unit(0.5, "cm")) +
+    ggspatial::annotation_north_arrow(
+      width = unit(0.7, "cm"),
+      height = unit(0.9, "cm"),
+      pad_x = unit(19, "cm"),
+      pad_y = unit(1, "cm"))
+variacao_uf_produtividade
+```
+
+```{r}
+ggsave("Images/variacao_uf_produtividade.png",
+    plot = variacao_uf_produtividade,
+    dpi = 600)
+```
