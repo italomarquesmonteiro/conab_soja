@@ -128,12 +128,14 @@ serie_historica_produtividade_soja <- serie_soja_temp |>
         label = "Fonte: Conab (2023)
     by Ítalo Monteiro" , color = "gray50")
 serie_historica_produtividade_soja
-#plotly::ggplotly(serie_historica_produtividade_soja)
+plotly::ggplotly(serie_historica_produtividade_soja)
 ```
 ```{r}
 ggsave("Images/serie_historica_produtividade_soja.png",
     plot = serie_historica_produtividade_soja,
-    dpi = 600)
+    dpi = 600,
+    width = 15,
+    height = 9)
 ```
 
 
