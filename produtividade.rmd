@@ -56,9 +56,10 @@ base_temp <- readxl::read_xls("C:/Users/italo/Downloads/SojaSerieHist.xls",
            name_region == "CENTRO-OESTE" ~ "Centro Oeste",
            name_region == "SUDESTE" ~ "Sudeste",
            name_region == "SUL" ~ "Sul",
-            TRUE~ name_region
+           name_region == "BRASIL" ~ "Brasil",
+            TRUE ~ name_region
         )) |>
-    dplyr::slice(1, 9, 19, 24, 29)  |>
+    dplyr::slice(1, 9, 19, 24, 29, 35)  |>
     dplyr::mutate(
         var_22_23 = ((`2022/23` / `2021/22`) * 100) - 100
     ) |>
@@ -80,6 +81,62 @@ serie_soja_temp <- base_temp |>
 ```
 
 
+Gráfico de série historica:
+    produtividade de soja (kg-ha)
+```{r}
+serie_historica_produtividade_soja <- serie_soja_temp |>
+    tidyr::separate(safras, into = c("ano", "ano_seq")) |>
+    dplyr::mutate(
+        ano = as.numeric(ano,
+        ano_seq = as.numeric(ano_seq)),
+        test = ano +1) |>
+    ggplot(aes(
+        x = as.numeric(test), y = qtd)) +
+    geom_line(aes(colour = name_region, linetype = name_region)) +
+    theme(
+        legend.position = c(0.7, 0.25),
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 10),
+        axis.title.x = element_text(size = 18),
+        axis.title.y = element_text(size = 18),
+        axis.text.y = element_text(size = 12, color = "black"),
+        axis.text.x = element_text(
+            size = 10, color = "black", angle = 60, hjust = 1, vjust = 1),
+        panel.grid.major = element_line(colour = "white"),
+        panel.background = element_rect(fill = "gray95"),
+        legend.background = element_rect(
+        fill = "grey95", colour = "white", size = 1)) +
+    labs(
+        color = "País/Região",
+        linetype = "",
+        x = "Safras",
+        y = "Produtividade (kg-ha)") +
+    scale_y_continuous(breaks = seq(0, 4000, 300)) +
+    scale_x_discrete(limits = c(
+        1977, 1978, 1979, 1980, 1981, 1982, 1983, 1984,
+        1985, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993,
+        1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+        2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+        2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+        2021, 2022, 2023)
+        ) +
+    annotate("text", x = 1986, y = 3800, color = "gray30", size = 8,
+        label = "Soja - Produtividade por hectare") +
+    annotate("text", x = 1985, y = 3650, color = "gray40", size = 6,
+        label = "Série histórica de safras (1976-2023)") +
+    annotate("text", x = 2020, y = 50, size = 4.5,
+        label = "Fonte: Conab (2023)
+    by Ítalo Monteiro" , color = "gray50")
+serie_historica_produtividade_soja
+#plotly::ggplotly(serie_historica_produtividade_soja)
+```
+```{r}
+ggsave("Images/serie_historica_produtividade_soja.png",
+    plot = serie_historica_produtividade_soja,
+    dpi = 600)
+```
+
+
 União dos dados espaciais com os dados no formato largo
 ```{r}
 serie_soja_wider <- estados_br |>
@@ -98,13 +155,13 @@ serie_soja_longer <- estados_br |>
 
 serie temporal da area plantada de soja no brasil
 ```{r}
-serie_soja_produtividade <- serie_soja_longer |> 
+serie_soja_produtividade <- serie_soja_longer |>
     ggplot(aes(
         x = safras, y = qtd, color = as.factor(name_region))) +
     theme(
         legend.position = c(0.8, 0.25),
         legend.title = element_text(size = 18),
-        legend.text=element_text(size = 14),
+        legend.text = element_text(size = 14), # nolint
         axis.title.x = element_text(size = 18),
         axis.title.y = element_text(size = 18),
         axis.text.y = element_text(size = 12, color = "black"),
@@ -148,7 +205,7 @@ variacao_soja_produtividade <- serie_soja_wider |>
     theme(
         legend.position = c(0.19, 0.25),
         legend.title = element_text(size = 18),
-        legend.text= element_text(size = 14),
+        legend.text = element_text(size = 14),
         axis.title.x = element_text(size = 18),
         axis.title.y = element_text(size = 18),
         axis.text.y = element_text(size = 14, color = "black"),
@@ -204,7 +261,7 @@ serie_soja_longer |>
     theme(
         legend.position = c(0.19, 0.25),
         legend.title = element_text(size = 18),
-        legend.text= element_text(size = 14),
+        legend.text = element_text(size = 14),
         axis.title.x = element_text(size = 18),
         axis.title.y = element_text(size = 18),
         axis.text.y = element_text(size = 14, color = "black"),
@@ -274,7 +331,7 @@ variacao_uf_produtividade <- serie_uf |>
     theme(
         legend.position = c(0.19, 0.25),
         legend.title = element_text(size = 18),
-        legend.text=element_text(size = 14),
+        legend.text = element_text(size = 14),
         axis.title.x = element_text(size = 18),
         axis.title.y = element_text(size = 18),
         axis.text.y = element_text(size = 14, color = "black"),
