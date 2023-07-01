@@ -1,6 +1,6 @@
 ---
-title: "Soja - Produtividade"
-description: "Serie historica"
+title: "Soja - Produtividade (kg-ha) por unidades da federação"
+description: "Serie historica 1976 - 2023"
 author script: 
   - name: "Ítalo Marques-Monteiro"
     github: https://github.com/italomarquesmonteiro
@@ -38,78 +38,217 @@ estados_br <- geobr::read_state(code_state = "all", year = 2020) |>
 ```
 
 
+
 [Conab](https://www.conab.gov.br/)
 Dados de soja série histórica [Conab](https://www.conab.gov.br/info-agro/safras/serie-historica-das-safras/itemlist/category/911-soja)
 Manipulação e criaçao da base por Unidades da Federação do Brasil.
-* Criada a coluna **variação da safra** 2022/2023  [(safra 2023 / safra 2022)*100]
 ```{r}
-base_state <- readxl::read_xls("C:/Users/italo/Downloads/SojaSerieHist.xls",
-                                        skip = 5) |>
+# dados de area plantada (mil-ha)
+area_state <- readxl::read_xls(
+    "C:/Users/italo/OneDrive/Área de Trabalho/VsCode/conab/SojaSerieHist.xls",
+                                    skip = 5) |>
     dplyr::rename(
         abbrev_state = `REGIÃO/UF`,
         `2022/23` = `2022/23 Previsão (¹)`) |>
     dplyr::slice(-c(1, 9, 19, 24, 29, 33, 34 : 37))  |>
-    dplyr::mutate(
-        var_22_23 = ((`2022/23` / `2021/22`) * 100) - 100
-    ) |>
     dplyr::glimpse()
-base_state |>
+area_state |>
+    tibble::view()
+
+
+#dados de produtividade (kg-ha)
+produtividade_state <- readxl::read_xls(
+    "C:/Users/italo/OneDrive/Área de Trabalho/VsCode/conab/SojaSerieHist.xls",
+                                        sheet = 2, skip = 5) |>
+    dplyr::rename(
+        abbrev_state = `REGIÃO/UF`,
+        `2022/23` = `2022/23 Previsão (¹)`) |>
+    dplyr::slice(-c(1, 9, 19, 24, 29, 33, 34 : 37))  |>
+    dplyr::glimpse()
+produtividade_state |>
+    tibble::view()
+
+
+producao_state <- readxl::read_xls(
+    "C:/Users/italo/OneDrive/Área de Trabalho/VsCode/conab/SojaSerieHist.xls",
+                                        sheet = 3, skip = 5) |>
+    dplyr::rename(
+        abbrev_state = `REGIÃO/UF`,
+        `2022/23` = `2022/23 Previsão (¹)`) |>
+    dplyr::slice(-c(1, 9, 19, 24, 29, 33, 34 : 37))  |>
+    dplyr::glimpse()
+producao_state |>
     tibble::view()
 ```
 
+
+Os dados estão em formato largo.
+Vou usar [pivot_longer](https://tidyr.tidyverse.org/reference/pivot_longer.html) para deixá-los no formato longo
 ```{r}
-serie_uf <- estados_br |>
-    dplyr::left_join(base_state) |>
-    dplyr::glimpse()
+area_temp <- area_state |>
+    tidyr::pivot_longer(
+        !abbrev_state,
+        names_to = "safras",
+        values_to = "area_mil_ha")
+
+
+produtividade_temp <- produtividade_state |>
+    tidyr::pivot_longer(
+        !abbrev_state,
+        names_to = "safras",
+        values_to = "produtividade_kg_ha")
+
+
+producao_temp <- producao_state |>
+    tidyr::pivot_longer(
+        !abbrev_state,
+        names_to = "safras",
+        values_to = "procucao_mil_t")
 ```
 
-```{r}	
-variacao_uf_produtividade <- serie_uf |>
-    ggplot() +
-    geom_sf(aes(fill = var_22_23)) +
-    geom_sf_text(aes(
-        label = serie_soja_wider$abbrev_state),
-        label.padding = unit(0.8, "mm"), size = 3) +
-    viridis::scale_fill_viridis(discrete = FALSE) +
+
+
+
+Gráfico - Série temporal da:
+    **area plantada** - mil ha
+    **produtividade** - kg ha
+    **producao** - mil t
+
+Verificar a comparação *RS vs MT*
+```{r}
+area_temp |>
+    tidyr::separate(safras, into = c("ano", "ano_seq")) |>
+    dplyr::select(-ano_seq) |>
+    dplyr::mutate(
+        ano = as.numeric(ano),
+        ano = ano + 1) |>
+    dplyr::filter(abbrev_state %in% c("RS", "MT")) |>
+    ggplot(aes(
+        x = as.numeric(ano), y = area_mil_ha)) +
+    geom_line(aes(colour = abbrev_state)) +
     theme(
-        legend.position = c(0.19, 0.25),
-        legend.title = element_text(size = 18),
-        legend.text = element_text(size = 14),
-        axis.title.x = element_text(size = 18),
-        axis.title.y = element_text(size = 18),
-        axis.text.y = element_text(size = 14, color = "black"),
-        axis.text.x = element_text(size = 14, color = "black"),
-        panel.grid.major = element_line(colour = "gray95"),
+        legend.position = c(0.7, 0.25),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 10),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 16),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.text.x = element_text(
+            size = 10, color = "black", angle = 60, hjust = 1, vjust = 1),
+        panel.grid.major = element_line(colour = "white"),
         panel.background = element_rect(fill = "gray95"),
         legend.background = element_rect(
-        fill = "grey95", colour = "gray95", size = 1)) +
+        fill = "grey95", colour = "white", size = 1)) +
     labs(
-        fill = "Variação por\nestados (%)",
-        x = "Longitude",
-        y = "Latitude") +
-    annotate("text", x = -51, y = 7, color = "gray30", size = 8,
-        label = "Área plantada - Variação da Safra 22/23 de Soja") +
-    annotate("text", x = -42, y = 5.5, color = "gray40", size = 4,
-        label = "Cálculo em relação a safra 21/22") +
-    annotate("text", x = -38, y = -25, color = "gray40", size = 5,
-        label = "Safras - Estimativa jun/23") +
-    annotate("text", x = -36, y = -27, size = 4.5,
+        color = "Estados - BR",
+        x = "Safras",
+        y = "Área plantada (mil-ha)") +
+    scale_y_continuous(breaks = seq(0, 13000, 500)) +
+    scale_x_discrete(limits = c(
+        1977, 1978, 1979, 1980, 1981, 1982, 1983, 1984,
+        1985, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993,
+        1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+        2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+        2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+        2021, 2022, 2023)
+        ) +
+    annotate("text", x = 1983, y = 12000, color = "gray30", size = 8,
+        label = "Soja - Área plantada") +
+    annotate("text", x = 1984, y = 11500, color = "gray40", size = 6,
+        label = "Série histórica de safras (1976-2023)") +
+    annotate("text", x = 2019, y = 100, size = 4.5,
         label = "Fonte: Conab (2023)
-    by Ítalo Monteiro" , color = "gray50") +
-    ggspatial::annotation_scale(
-      height = unit(0.2, "cm"),
-      pad_x = unit(17, "cm"),
-      pad_y = unit(0.5, "cm")) +
-    ggspatial::annotation_north_arrow(
-      width = unit(0.7, "cm"),
-      height = unit(0.9, "cm"),
-      pad_x = unit(19, "cm"),
-      pad_y = unit(1, "cm"))
-variacao_uf_produtividade
-```
+    by Ítalo Monteiro" , color = "gray50")
 
-```{r}
-ggsave("Images/variacao_uf_produtividade.png",
-    plot = variacao_uf_produtividade,
-    dpi = 600)
+
+
+
+produtividade_temp |>
+    tidyr::separate(safras, into = c("ano", "ano_seq")) |>
+    dplyr::select(-ano_seq) |>
+    dplyr::mutate(
+        ano = as.numeric(ano),
+        ano = ano + 1) |>
+    dplyr::filter(abbrev_state %in% c("RS", "MT")) |>
+    ggplot(aes(
+        x = as.numeric(ano), y = produtividade_kg_ha)) +
+    geom_line(aes(colour = abbrev_state)) +
+    theme(
+        legend.position = c(0.7, 0.25),
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 10),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        axis.text.y = element_text(size = 12, color = "black"),
+        axis.text.x = element_text(
+            size = 10, color = "black", angle = 60, hjust = 1, vjust = 1),
+        panel.grid.major = element_line(colour = "white"),
+        panel.background = element_rect(fill = "gray95"),
+        legend.background = element_rect(
+        fill = "grey95", colour = "white", size = 1)) +
+    labs(
+        color = "Estados - BR",
+        x = "Safras",
+        y = "Produtividade (kg-ha)") +
+    scale_y_continuous(breaks = seq(0, 4000, 250)) +
+    scale_x_discrete(limits = c(
+        1977, 1978, 1979, 1980, 1981, 1982, 1983, 1984,
+        1985, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993,
+        1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+        2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+        2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+        2021, 2022, 2023)
+        ) +
+    annotate("text", x = 1986, y = 3900, color = "gray30", size = 8,
+        label = "Soja - Produtividade por hectare") +
+    annotate("text", x = 1985, y = 3750, color = "gray40", size = 6,
+        label = "Série histórica de safras (1976-2023)") +
+    annotate("text", x = 2019, y = 100, size = 4.5,
+        label = "Fonte: Conab (2023)
+    by Ítalo Monteiro" , color = "gray50")
+
+
+producao_temp |>
+    tidyr::separate(safras, into = c("ano", "ano_seq")) |>
+    dplyr::select(-ano_seq) |>
+    dplyr::mutate(
+        ano = as.numeric(ano),
+        ano = ano + 1) |>
+    dplyr::filter(abbrev_state %in% c("RS", "MT")) |>
+    ggplot(aes(
+        x = as.numeric(ano), y = procucao_mil_t)) +
+    geom_line(aes(colour = abbrev_state)) +
+    theme(
+        legend.position = c(0.3, 0.4),
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 10),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        axis.text.y = element_text(size = 12, color = "black"),
+        axis.text.x = element_text(
+            size = 10, color = "black", angle = 60, hjust = 1, vjust = 1),
+        panel.grid.major = element_line(colour = "white"),
+        panel.background = element_rect(fill = "gray95"),
+        legend.background = element_rect(
+        fill = "grey95", colour = "white", size = 1)) +
+    labs(
+        color = "Estados - BR",
+        x = "Safras",
+        y = "Produção (mil t)") +
+    scale_y_continuous(breaks = seq(0, 50000, 3000)) +
+    scale_x_discrete(limits = c(
+        1977, 1978, 1979, 1980, 1981, 1982, 1983, 1984,
+        1985, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993,
+        1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+        2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+        2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+        2021, 2022, 2023)
+        ) +
+    annotate("text", x = 1987, y = 45000, color = "gray30", size = 8,
+        label = "Soja - Produção em mil toneladas") +
+    annotate("text", x = 1986, y = 43500, color = "gray40", size = 6,
+        label = "Série histórica de safras (1976-2023)") +
+    annotate("text", x = 2019, y = 100, size = 4.5,
+        label = "Fonte: Conab (2023)
+    by Ítalo Monteiro" , color = "gray50")
 ```
