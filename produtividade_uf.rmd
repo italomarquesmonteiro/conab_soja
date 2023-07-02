@@ -2,39 +2,43 @@
 title: "Soja - Produtividade (kg-ha) por unidades da federação"
 description: "Serie historica 1976 - 2023"
 author script: 
-  - name: "Ítalo Marques-Monteiro"
-    github: https://github.com/italomarquesmonteiro
-    kaggle: https://www.kaggle.com/talomarquesmonteiro
-    linkedin: linkedin.com/in/ítalo-monteiro-0b2516144
-    lattes: http://lattes.cnpq.br/7174985368517137
-    orcid_id: https://orcid.org/0000-0003-4367-1034
-    affiliation: Anhanguera College  
-        - Department: Veterinary Medicine
+   #name: "Ítalo Marques-Monteiro"
+   # github: https://github.com/italomarquesmonteiro
+   # kaggle: https://www.kaggle.com/talomarquesmonteiro
+   # linkedin: linkedin.com/in/ítalo-monteiro-0b2516144
+   # lattes: http://lattes.cnpq.br/7174985368517137
+   # orcid_id: https://orcid.org/0000-0003-4367-1034
+   # affiliation: Anhanguera College  
+   #      Department: Veterinary Medicine
 date: "2023-06-01"
 output: html_document
 ---
 
+
 O package [tidyverse](https://www.tidyverse.org) possui um ecossistema de packages:
-                           ->[{`ggplot2`}](https://ggplot2.tidyverse.org/).
-                            ->[{`tibble`}](https://tibble.tidyverse.org/).
-                             ->[{`tidyr`}](https://tidyr.tidyverse.org/).
-                              ->[{`dplyr`}](https://dplyr.tidyverse.org/).
-                               ->[{`readr`}](https://readr.tidyverse.org/).
-                                ->[{`purrr`}](https://purrr.tidyverse.org/).
-                                 ->[{`forcats`}](https://forcats.tidyverse.org/).
+
+  [ggplot2](https://ggplot2.tidyverse.org/).
+  [tibble](https://tibble.tidyverse.org/).
+  [tidyr](https://tidyr.tidyverse.org/).
+  [dplyr](https://dplyr.tidyverse.org/).
+  [{readr](https://readr.tidyverse.org/).
+  [{purrr](https://purrr.tidyverse.org/).
+  [forcats](https://forcats.tidyverse.org/).
 ```{r}
 library(conflicted)
 library(tidyverse)
 ```
 
 
-O package [{`geobr`}](https://github.com/ipeaGIT/geobr). 
-* Tem fácil acesso a conjuntos de dados espaciais oficiais do Brasil como objetos 'sf' em R. 
-* O pacote inclui uma ampla gama de dados geoespaciais disponíveis em várias escalas geográficas e por vários anos com atributos harmonizados, projeção e topologia fixa.
-* Os dados são do Instituto Brasileiro de Geografia e Estatística[IBGE](https://concla.ibge.gov.br/classificacoes/por-tema/codigo-de-areas/codigo-de-areas)
+O package [geobr](https://github.com/ipeaGIT/geobr).
+
+Tem fácil acesso a conjuntos de dados espaciais oficiais do Brasil como objetos 'sf' em R. 
+O pacote inclui uma ampla gama de dados geoespaciais disponíveis em várias escalas geográficas e por vários anos com atributos harmonizados, projeção e topologia fixa.
+
+* Os dados são do Instituto Brasileiro de Geografia e Estatística [IBGE](https://concla.ibge.gov.br/classificacoes/por-tema/codigo-de-areas/codigo-de-areas)
 ```{r}
-estados_br <- geobr::read_state(code_state = "all", year = 2020) |>
-    dplyr::glimpse()
+#estados_br <- geobr::read_state(code_state = "all", year = 2020) |>
+#    dplyr::glimpse()
 ```
 
 
@@ -110,8 +114,11 @@ producao_temp <- producao_state |>
 
 
 Gráfico - Série temporal da:
+
     **area plantada** - mil ha
+    
     **produtividade** - kg ha
+    
     **producao** - mil t
 
 Verificar a comparação *RS vs MT*
@@ -208,7 +215,7 @@ produtividade_temp |>
     by Ítalo Monteiro" , color = "gray50")
 
 
-producao_temp |>
+grafico_producao <- producao_temp |>
     tidyr::separate(safras, into = c("ano", "ano_seq")) |>
     dplyr::select(-ano_seq) |>
     dplyr::mutate(
@@ -251,4 +258,10 @@ producao_temp |>
     annotate("text", x = 2019, y = 100, size = 4.5,
         label = "Fonte: Conab (2023)
     by Ítalo Monteiro" , color = "gray50")
+grafico_producao
 ```
+
+```{r}
+plotly::ggplotly(grafico_producao)
+```
+
